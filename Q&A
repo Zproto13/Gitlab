@@ -1,0 +1,347 @@
+ ## Support Engineer Take-home Assessment, Intermediate+
+
+**Important:**
+
+- **Please note that [markdown](https://www.markdownguide.org/getting-started/) is the required format for your submission.** To ensure a speedy process, please do not submit other formats, such as PDF. There are several tools, such as [Dillinger](https://dillinger.io/), that can be used to verify your Markdown before submission.
+
+- **While working on this assessment, you can consult external sources, but you must cite them.** GitLab wants to see how you use tools and language; please cite all tools and sources used. When using AI, please add which one you used and the exact phrase you prompted. **Failure to cite sources or tools (including AI) may result in the end of your candidacy.**
+=================================
+
+1. Write a Ruby or Bash script that will print usernames of all users on a Linux system
+   together with their home directories. Here's some example output:
+
+   ```
+   gitlab:/home/gitlab
+   nobody:/nonexistent
+   .
+   .
+   ```
+   Each line is a concatenation of a username, the colon
+   character (`:`), and the home directory path for that username. Your script
+   should output such a line for each user on the system.
+-----
+A: 
+BASH
+#!/bin/bash
+
+# Read and process the /etc/passwd file
+while IFS=: read -r username _ _ _ _ homedir _; do
+    # Print the username and home directory in the desired format
+    echo "${username}:${homedir}"
+done < /etc/passwd
+=== 
+RUBY
+#!/usr/bin/env ruby
+
+# Open and read the /etc/passwd file
+File.foreach('/etc/passwd') do |line|
+  # Split each line into fields based on the colon delimiter
+  fields = line.split(':')
+  username = fields[0]      # Username is the first field
+  home_dir = fields[5]      # Home directory is the sixth field
+
+  # Print the username and home directory in the desired format
+  puts "#{username}:#{home_dir}"
+end
+-----
+   
+2. Next, write a second script that:
+
+   * Takes the full output of your first script and converts it to an MD5 hash.
+   * On its first run stores the MD5 checksum into the `/var/log/current_users` file.
+   * On subsequent runs, if the MD5 checksum changes, the script should add a line in
+     the `/var/log/user_changes` file with the message,
+     `DATE TIME changes occurred`, replacing `DATE` and `TIME` with appropriate
+     values, and replaces the old MD5 checksum in `/var/log/current_users`
+     file with the new MD5 checksum.
+
+-----
+A: BASH
+#!/bin/bash
+
+# Paths to log files
+CURRENT_USERS_FILE="/var/log/current_users"
+USER_CHANGES_LOG="/var/log/user_changes"
+
+# Command to generate the user and home directory list
+USER_SCRIPT="./print_users.sh"  # Replace with ./print_users.rb if using the Ruby script
+
+# Generate the output from the first script
+USER_OUTPUT=$($USER_SCRIPT)
+
+# Compute the MD5 checksum of the user output
+CURRENT_MD5=$(echo "$USER_OUTPUT" | md5sum | awk '{print $1}')
+
+# Check if the current_users file exists
+if [ ! -f "$CURRENT_USERS_FILE" ]; then
+    # First run: save the MD5 checksum to the file
+    echo "$CURRENT_MD5" > "$CURRENT_USERS_FILE"
+    echo "First run: MD5 checksum stored."
+else
+    # Read the previously stored MD5 checksum
+    PREVIOUS_MD5=$(cat "$CURRENT_USERS_FILE")
+
+    # Compare the checksums
+    if [ "$CURRENT_MD5" != "$PREVIOUS_MD5" ]; then
+        # MD5 checksum has changed
+        DATE_TIME=$(date '+%Y-%m-%d %H:%M:%S')  # Get the current date and time
+        echo "$DATE_TIME changes occurred" >> "$USER_CHANGES_LOG"  # Log the change
+        echo "$CURRENT_MD5" > "$CURRENT_USERS_FILE"  # Update the checksum file
+        echo "Changes detected and logged."
+    else
+        echo "No changes detected."
+    fi
+fi
+
+-----
+
+3. Finally, write a crontab entry that runs these scripts hourly.
+
+   Provide both scripts and the crontab entry for the answer to be
+   complete.
+
+-----
+A: 
+Listing Script
+#!/bin/bash
+
+# Read and process the /etc/passwd file
+while IFS=: read -r username _ _ _ _ homedir _; do
+    # Print the username and home directory in the desired format
+    echo "${username}:${homedir}"
+done < /etc/passwd
+=== 
+Change tracking script
+#!/bin/bash
+
+# Paths to log files
+CURRENT_USERS_FILE="/var/log/current_users"
+USER_CHANGES_LOG="/var/log/user_changes"
+
+# Command to generate the user and home directory list
+USER_SCRIPT="/path/to/print_users.sh"  # Replace with the correct path to your first script
+
+# Generate the output from the first script
+USER_OUTPUT=$($USER_SCRIPT)
+
+# Compute the MD5 checksum of the user output
+CURRENT_MD5=$(echo "$USER_OUTPUT" | md5sum | awk '{print $1}')
+
+# Check if the current_users file exists
+if [ ! -f "$CURRENT_USERS_FILE" ]; then
+    # First run: save the MD5 checksum to the file
+    echo "$CURRENT_MD5" > "$CURRENT_USERS_FILE"
+    echo "First run: MD5 checksum stored."
+else
+    # Read the previously stored MD5 checksum
+    PREVIOUS_MD5=$(cat "$CURRENT_USERS_FILE")
+
+    # Compare the checksums
+    if [ "$CURRENT_MD5" != "$PREVIOUS_MD5" ]; then
+        # MD5 checksum has changed
+        DATE_TIME=$(date '+%Y-%m-%d %H:%M:%S')  # Get the current date and time
+        echo "$DATE_TIME changes occurred" >> "$USER_CHANGES_LOG"  # Log the change
+        echo "$CURRENT_MD5" > "$CURRENT_USERS_FILE"  # Update the checksum file
+        echo "Changes detected and logged."
+    else
+        echo "No changes detected."
+    fi
+fi
+====
+crontab -e
+Add the following line:
+0 * * * * /path/to/check_user_changes.sh
+-----
+=====================================================================
+
+1. A user is complaining that it's taking a long time to load a page on our
+   web application. In your own words, write down and discuss the possible
+   cause(s) of the slowness. Also describe how you would begin to troubleshoot
+   this issue?
+
+   Keep the following information about the environment in mind:
+
+   * The web application is written in a modern MVC web framework.
+   * Application data is stored in a relational database.
+   * All components (web application, web server, database) are running on a single
+     Linux box with 8GB RAM, 2 CPU cores, and SSD storage with ample free space.
+   * You have root access to this Linux box.
+
+   We are interested in learning about your experience with modern web
+   applications, and your ability to reason about system design and
+   architectural trade-offs. There is no right or wrong answer to this
+   question. Feel free to write as much or as little as you feel is necessary.
+-----
+A.
+When an end-user complains about a slow-loading page on a web application, there are a few possible causes to triage. Since all components are running on a single Linux box with limited resources, bottlenecks can arise in several areas: application logic, database queries, server configuration, or resource constraints. The possible Causes of Slowness can be linked to:
+1. Application Layer 
+2. Slow unoptimized queries
+4. System Resource issues such as High CPU Usage: 
+5. Potential networking issues from Client-Side 
+
+To troubleshoot
+
+Step 1: Try to first reproduce the Issue
+Step 2: Check Server Resource Usage
+Step 3: Check the logs
+Step 4: Analyze the Database for any discrepancies
+Step 4: Test the UI for any additional performance issues
+-----
+==========================
+
+1. The Git commit graph below shows the output of `git log --all --decorate --oneline --graph`. What sequence of Git commands would result in this commit graph when starting from an empty directory?
+
+```
+* 3ceaba9 (HEAD -> main) fourth commit
+*   6b5b81f Merge
+|\
+| * 9f22672 (feature-branch) awesome feature
+* | 572982b third commit
+|/
+* 87acf21 second commit
+* 5662bb5 first commit
+```
+-----
+Here is the sequence of Git commands that would result in the given commit graph, starting from an empty directory:
+
+# Initialize repository
+git init
+
+# First commit on main
+echo "first commit" > file.txt
+git add file.txt
+git commit -m "first commit"
+
+# Second commit on main
+echo "second commit" >> file.txt
+git add file.txt
+git commit -m "second commit"
+
+# Create and switch to feature-branch
+git checkout -b feature-branch
+
+# Add commit to feature-branch
+echo "awesome feature" > feature.txt
+git add feature.txt
+git commit -m "awesome feature"
+
+# Switch back to main
+git checkout main
+
+# Third commit on main
+echo "third commit" >> file.txt
+git add file.txt
+git commit -m "third commit"
+
+# Merge feature-branch into main
+git merge --no-ff feature-branch -m "Merge"
+
+# Fourth commit on main
+echo "fourth commit" >> file.txt
+git add file.txt
+git commit -m "fourth commit"
+
+-----
+==========================
+
+1. GitLab has hired you to write a Git tutorial for beginners on this topic:
+
+   **Using Git to implement a new feature/change without affecting the main branch**
+   
+   In your own words, write a tutorial/blog explaining things in a beginner-friendly way. 
+   Make sure to address both the "why" and "how" for each Git command you use.  Assume 
+   the audience are readers of a well known blog.
+
+-----
+Using Git to Implement a New Feature Without Affecting the Main Branch
+Git is an incredibly powerful tool for managing code, but one of its most essential features is the ability to work on new features or changes without impacting the main branch of your project. In this tutorial, we'll explain how to use Git to create a separate branch for a new feature, make changes safely, and merge those changes back into the main branch when they're ready. This workflow ensures that your main branch remains stable while you experiment and develop.
+
+Why Work on a Separate Branch?
+Before jumping into commands, let's discuss why it's important to work on a separate branch:
+
+	Stability of the Main Branch:
+	The main branch (main) is often considered the "production-ready" version of the code. By keeping it stable, you avoid breaking your 	application while adding new features or making changes.
+
+	Team Collaboration:
+	In team projects, branching allows multiple developers to work on different features simultaneously without interfering with one another.
+
+	Testing and Experimentation:
+	A branch gives you a sandbox to test and refine your changes before they’re integrated into the main branch.
+
+	Easier Rollback:
+	If something goes wrong, changes made on a branch can easily be discarded without affecting the main branch.
+
+	Step-by-Step Guide: Implementing a Feature Without Affecting the Main Branch
+	Let’s say you’re working on a web application, and you want to add a new login feature. Here’s how you can do it using Git.
+
+1. Start by Checking Out the main Branch
+Before starting any new work, make sure you're on the main branch and it's up to date.
+
+2. Create a New Branch for Your Feature
+Create a new branch where you’ll work on your feature. Let’s call it feature/login. Why it’s important? This isolates your changes from the main branch, allowing you to experiment without risk.
+
+3. Make Changes and Commit Them
+Start working on your feature by editing or adding files. For example, you might create a new file for the login functionality.
+
+4. Push Your Branch to the Remote Repository
+If you're working with a team or want to back up your work, push your branch to the remote repository:
+
+5. Test Your Feature
+Before merging your changes into main, thoroughly test your feature. This step ensures that your work doesn’t introduce bugs or issues.
+
+6. Merge Your Feature Branch into main
+Once your feature is complete and tested, merge it back into the main branch. First, switch to the main branch:
+
+7. Delete the Feature Branch
+After merging, delete the feature branch to keep your repository clean:
+
+Summary of Git Commands
+Here’s a quick reference for the commands used in this tutorial:
+
+bash
+Copy code
+# Switch to the main branch and update it
+git checkout main
+git pull origin main
+
+# Create and switch to a new branch
+git checkout -b feature/<feature-name>
+
+# Make changes and commit them
+git add <file>
+git commit -m "Your commit message"
+
+# Push the branch to the remote repository
+git push origin feature/<feature-name>
+
+# Merge the feature branch into main
+git checkout main
+git merge feature/<feature-name>
+
+# Delete the feature branch
+git branch -d feature/<feature-name>
+
+Conclusion
+Using branches in Git is a best practice for managing new features and changes. By creating a dedicated branch, you can experiment and collaborate safely without risking the stability of your main branch. Whether you’re working alone or as part of a team, this workflow keeps your codebase clean, organized, and ready for production.
+
+Start using branches today and take your Git skills to the next level! 
+-----
+==========================
+
+1. What is a technical book/blog/course/etc. you experienced recently or in the past that you enjoyed?  
+
+A.
+A technical course that I have recently taken that I've taken a liking to is the Google Data Analytics certificate course. So far it was able to help expedite my knowledge in Data.
+==========
+
+References:
+~Stack Overflow
+~ChatGPT - OpenAI (Most of the direct coding)
+~Git Documentation - Branching and Merging
+~Official Git documentation provides detailed explanations about branching, merging, and other Git features. Pro Git Book by Scott Chacon and Ben Straub
+~Atlassian Git Tutorials
+~GitHub Docs - Git Basics
+===================
+ChatGPT Prompts
+-Question 1 pt A, B, & C
+-Question 3
